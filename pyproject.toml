@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transformer-playground"
+version = "0.0.1"
+authors = [{name = "Nikolai Zakharov"}]
+
+#[project.scripts]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["transformer-playground"]

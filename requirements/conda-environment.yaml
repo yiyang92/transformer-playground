@@ -1,0 +1,33 @@
+name: transformer-playground
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - huggingface
+dependencies:
+  - python=3.11
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-cuda=11.7
+  - pip=23.1
+  - pip:
+    - tensorboard~=2.12
+    - tqdm~=4.65
+    - opendelta~=0.3.2
+    - gdown~=4.7
+    - mypy~=1.1
+    - black~=23.3
+    - flake8~=6.0
+    - gptq==0.0.3
+    - deepspeed~=0.9.2
+    - numba
+    - jupyterlab
+    - torch-summary
+    - onnx-tf
+    - pandas
+    - scikit-learn
+    - gitpython
+    - cython
+    - matplotlib
+    - transformers
