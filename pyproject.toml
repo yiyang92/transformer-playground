@@ -11,4 +11,4 @@ authors = [{name = "Nikolai Zakharov"}]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["transformer-playground"]
+include = ["tplayground"]

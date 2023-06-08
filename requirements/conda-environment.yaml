@@ -21,6 +21,7 @@ dependencies:
     - flake8~=6.0
     - gptq==0.0.3
     - deepspeed~=0.9.2
+    - tokenizers~=0.13
     - numba
     - jupyterlab
     - torch-summary
