@@ -41,22 +41,34 @@ class Registry(Params):
 @params_decorator
 class AttentionParams(Params):
     num_heads: int
-    input_dim: int
-    head_dim: int
+    hidden_size: int
 
     masked: bool = False
     linear_out: bool = True
 
     def finalize(self):
-        assert self.head_dim % self.num_heads == 0
+        assert self.hidden_size % self.num_heads == 0
+
+
+@params_decorator
+class FFLayerParams(Params):
+    # Position-wise FF layer
+    dropout_drop_prob: float = 0.5
+    hidden_size: int
 
 
 @params_decorator
 class TransformerParams(Params):
     # For encoder and decoder layers
     num_layers: int
-    hidden_size: int
+    model_dim: int  # Model input-output dimension
+
     attention_params: AttentionParams
+    ff_layer_params: FFLayerParams
+
+    def finalize(self):
+        if self.attention_params.hidden_size != self.model_dim:
+            assert self.attention_params.linear_out
 
 
 @params_decorator
@@ -66,7 +78,7 @@ class ModelParams(Params):
     encoder_params: Optional[TransformerParams]
     decoder_params: Optional[TransformerParams]
 
-    def overwrite_default_attributes():
+    def overwrite_default_attributes(self):
         pass
 
     def __post_init__(self):

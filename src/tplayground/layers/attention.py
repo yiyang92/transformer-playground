@@ -12,7 +12,7 @@ def dot_product_attention(
     query: torch.Tensor, key: torch.Tensor, value: torch.Tensor
 ) -> torch.Tensor:
     scale = math.sqrt(key.size(-1))
-    alpha = query @ key.transpose(1, 2) / scale
+    alpha = torch.bmm(query, key.transpose(1, 2)) / scale
     alpha = F.softmax(alpha, dim=-1)
     return torch.bmm(alpha, value)
 
@@ -42,20 +42,18 @@ class AttentionHead(nn.Module):
 
 
 class MultiHeadSelfAttention(nn.Module):
-    def __init__(self, params: AttentionParams) -> None:
+    def __init__(self, params: AttentionParams, model_dim: int) -> None:
         super().__init__()
         # TODO: use clever reshape, not just head concat
         self._heads = nn.ModuleList(
             [
-                AttentionHead(
-                    params.input_dim, params.head_dim // params.num_heads
-                )
+                AttentionHead(model_dim, params.hidden_size // params.num_heads)
                 for _ in range(params.num_heads)
             ]
         )
         self._out_linear = None
         if params.linear_out:
-            self._out_linear = nn.Linear(params.head_dim, params.head_dim)
+            self._out_linear = nn.Linear(params.hidden_size, model_dim)
 
     def forward(self, hidden_state: torch.Tensor) -> torch.Tensor:
         outs = []
@@ -63,4 +61,6 @@ class MultiHeadSelfAttention(nn.Module):
             outs.append(head(hidden_state))
 
         out = torch.concat(outs, dim=-1)
+        if self._out_linear is not None:
+            out = self._out_linear(out)
         return out
