@@ -6,9 +6,9 @@ channels:
   - huggingface
 dependencies:
   - python=3.11
-  - pytorch
-  - torchvision
-  - torchaudio
+  - pytorch~=2.0
+  - torchvision~=0.15
+  - torchaudio~=2.0
   - pytorch-cuda=11.7
   - pip=23.1
   - pip:

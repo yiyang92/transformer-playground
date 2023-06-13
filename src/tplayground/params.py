@@ -3,7 +3,7 @@ from typing import Optional
 from dataclasses import dataclass, is_dataclass
 
 from tplayground.utils.params import Params, params_decorator, camel_to_snake
-from tplayground.utils.constants import TransformerType
+from tplayground.utils.constants import TransformerType, NormalizationMode
 
 
 class Registry(Params):
@@ -18,7 +18,7 @@ class Registry(Params):
         params = Registry.get_params("bert_base")
     """
 
-    registered_params = dict()
+    registered_params: dict[str, type["Params"]] = dict()
 
     @classmethod
     def register(cls, params: type["Params"]):
@@ -39,12 +39,26 @@ class Registry(Params):
 
 
 @params_decorator
+class TextInputParams(Params):
+    vocab_size: int
+    max_position: int
+
+
+@params_decorator
 class AttentionParams(Params):
     num_heads: int
     hidden_size: int
 
-    masked: bool = False
+    attention_drop_prob: float = 0.5
+    residual_drop_prob: float = 0.5
+
+    causal: bool = False
+    use_flash: bool = False  # If use torch 2.0 Flash Attention kernel
     linear_out: bool = True
+    scale: bool = True
+
+    # If use not torch causal flash attention
+    causal_buffer_size: int = 1000
 
     def finalize(self):
         assert self.hidden_size % self.num_heads == 0
@@ -62,18 +76,20 @@ class TransformerParams(Params):
     # For encoder and decoder layers
     num_layers: int
     model_dim: int  # Model input-output dimension
+    norm_mode: NormalizationMode = NormalizationMode.on_input
 
     attention_params: AttentionParams
     ff_layer_params: FFLayerParams
 
     def finalize(self):
-        if self.attention_params.hidden_size != self.model_dim:
-            assert self.attention_params.linear_out
+        # Usually like this, may experiment
+        assert self.attention_params.hidden_size == self.model_dim
 
 
 @params_decorator
 class ModelParams(Params):
     model_type: TransformerType
+    text_input_params: TextInputParams
 
     encoder_params: Optional[TransformerParams]
     decoder_params: Optional[TransformerParams]

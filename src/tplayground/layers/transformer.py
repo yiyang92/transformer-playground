@@ -15,9 +15,7 @@ class TransformerLayer(nn.Module):
             nn.LayerNorm(params.model_dim),
             nn.LayerNorm(params.model_dim),
         )
-        self._attention = MultiHeadSelfAttention(
-            params.attention_params, model_dim=params.model_dim
-        )
+        self._attention = MultiHeadSelfAttention(params.attention_params)
         self._ff = FeedForward(
             params.ff_layer_params, model_dim=params.model_dim
         )
