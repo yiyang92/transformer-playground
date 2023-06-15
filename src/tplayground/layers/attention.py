@@ -13,7 +13,10 @@ class MultiHeadSelfAttention(nn.Module):
         # Multi-head attention tensor
         self._params = params
         self._head_dim = params.hidden_size // params.num_heads
-        self._c_attn = nn.Linear(params.hidden_size, params.hidden_size * 3)
+        self._query_proj = nn.Linear(params.hidden_size, params.hidden_size)
+        self._key_proj = nn.Linear(params.hidden_size, params.hidden_size)
+        if params.value_proj:
+            self._value_proj = nn.Linear(params.hidden_size, params.hidden_size)
         # Dropout in attention and output
         self._attn_dropout = nn.Dropout(params.attention_drop_prob)
         self._resid_dropout = nn.Dropout(params.residual_drop_prob)
@@ -31,10 +34,19 @@ class MultiHeadSelfAttention(nn.Module):
         if params.linear_out:
             self._c_proj = nn.Linear(params.hidden_size, params.hidden_size)
 
-    def _qkv_heads(self, input: Tensor) -> tuple[Tensor, Tensor, Tensor]:
+    def _qkv_heads(
+        self, input: Tensor, encoder_out: Tensor
+    ) -> tuple[Tensor, Tensor, Tensor]:
         # [b_s, seq_len, model_dim] -> [b_s, seq_len, head_dim * #heads * 3]
-        proj = self._c_attn(input)
-        query, key, value = proj.split(proj.size()[-1] // 3, dim=2)
+        value = input
+        if self._params.value_proj:
+            value = self._value_proj(input)
+
+        if encoder_out is not None:
+            input = encoder_out
+
+        query = self._query_proj(input)
+        key = self._value_proj(input)
         # Split into heads
         new_shape = query.size()[:-1] + (
             self._params.num_heads,
@@ -67,14 +79,13 @@ class MultiHeadSelfAttention(nn.Module):
             scale = 1 / key.size(-1) ** 0.5
 
         attn_weight = torch.matmul(query, key.transpose(-2, -1)) * scale
-        # TODO: add causality and attention mask
-        attn_weight = nn.functional.softmax(attn_weight, dim=-1)
         if self._params.causal:
             # NOTE: simple not efficient implementation for now
             seq_len = query.size()[-2]
             causal_mask = torch.tril(torch.ones((seq_len, seq_len)))
             causal_mask = causal_mask.view(1, 1, seq_len, seq_len) == 0
             attn_weight = attn_weight.masked_fill(causal_mask, float("-inf"))
+        attn_weight = nn.functional.softmax(attn_weight, dim=-1)
         attn_weight = self._attn_dropout(attn_weight)
         out = torch.matmul(attn_weight, value)
         return out
@@ -91,9 +102,8 @@ class MultiHeadSelfAttention(nn.Module):
             return self._c_proj(attn_out)
         return attn_out
 
-    def forward(self, input: Tensor) -> Tensor:
-        # TODO: how to use q, k from encoder
-        query, key, value = self._qkv_heads(input)
+    def forward(self, input: Tensor, encoder_out: Tensor = None) -> Tensor:
+        query, key, value = self._qkv_heads(input, encoder_out)
         out = self._attn(query, key, value)
         out = self._resid_dropout(self._out_proj(out))
         return out

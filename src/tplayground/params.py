@@ -3,7 +3,11 @@ from typing import Optional
 from dataclasses import dataclass, is_dataclass
 
 from tplayground.utils.params import Params, params_decorator, camel_to_snake
-from tplayground.utils.constants import TransformerType, NormalizationMode
+from tplayground.utils.constants import (
+    TransformerType,
+    NormalizationMode,
+    Activations,
+)
 
 
 class Registry(Params):
@@ -39,9 +43,22 @@ class Registry(Params):
 
 
 @params_decorator
+class OptimizerParams:
+    beta_one: float = 0.9
+    beta_two: float = 0.98
+
+
+@params_decorator
+class TrainingParams:
+    optimizer_params: OptimizerParams
+
+
+@params_decorator
 class TextInputParams(Params):
     vocab_size: int
     max_position: int
+
+    embed_dropout: float = 0.5
 
 
 @params_decorator
@@ -56,9 +73,7 @@ class AttentionParams(Params):
     use_flash: bool = False  # If use torch 2.0 Flash Attention kernel
     linear_out: bool = True
     scale: bool = True
-
-    # If use not torch causal flash attention
-    causal_buffer_size: int = 1000
+    value_proj: bool = True
 
     def finalize(self):
         assert self.hidden_size % self.num_heads == 0
@@ -68,6 +83,7 @@ class AttentionParams(Params):
 class FFLayerParams(Params):
     # Position-wise FF layer
     dropout_drop_prob: float = 0.5
+    activation: Activations = Activations.gelu
     hidden_size: int
 
 
@@ -77,6 +93,7 @@ class TransformerParams(Params):
     num_layers: int
     model_dim: int  # Model input-output dimension
     norm_mode: NormalizationMode = NormalizationMode.on_input
+    layer_norm_eps: float = 1e-5
 
     attention_params: AttentionParams
     ff_layer_params: FFLayerParams
@@ -84,15 +101,24 @@ class TransformerParams(Params):
     def finalize(self):
         # Usually like this, may experiment
         assert self.attention_params.hidden_size == self.model_dim
+        # According to transformer paper
+        if not self.ff_layer_params.hidden_size:
+            self.ff_layer_params.hidden_size = 4 * self.model_dim
 
 
 @params_decorator
 class ModelParams(Params):
+    # TODO: add task head enum and parameter
     model_type: TransformerType
     text_input_params: TextInputParams
 
     encoder_params: Optional[TransformerParams]
     decoder_params: Optional[TransformerParams]
+
+    def finalize(self):
+        if self.model_type == TransformerType.decoder_based:
+            assert self.decoder_params
+            self.decoder_params.causal = True
 
     def overwrite_default_attributes(self):
         pass
@@ -106,3 +132,9 @@ class ModelParams(Params):
 class BERTSmall(ModelParams):
     def overwrite_default_attributes(self):
         self.model_type = TransformerType.encoder_based
+
+
+@Registry.register
+class NANOGpt(ModelParams):
+    def overwrite_default_attributes(self):
+        self.model_type = TransformerType.decoder_based

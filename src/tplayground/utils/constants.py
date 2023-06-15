@@ -1,4 +1,10 @@
-from enum import Enum
+from enum import Enum, auto
+
+
+class Activations(Enum):
+    gelu = auto()
+    relu = auto()
+    mish = auto()
 
 
 class Models(Enum):
