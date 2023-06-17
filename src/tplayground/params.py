@@ -7,6 +7,7 @@ from tplayground.utils.constants import (
     TransformerType,
     NormalizationMode,
     Activations,
+    TransformerHead,
 )
 
 
@@ -58,7 +59,9 @@ class TextInputParams(Params):
     vocab_size: int
     max_position: int
 
-    embed_dropout: float = 0.5
+    # https://paperswithcode.com/method/weight-tying
+    # Might generate some torch compile warinings
+    out_in_emb_tying: bool = True
 
 
 @params_decorator
@@ -66,11 +69,11 @@ class AttentionParams(Params):
     num_heads: int
     hidden_size: int
 
-    attention_drop_prob: float = 0.5
-    residual_drop_prob: float = 0.5
+    attention_drop_prob: float = 0.0
+    residual_drop_prob: float = 0.0
 
     causal: bool = False
-    use_flash: bool = False  # If use torch 2.0 Flash Attention kernel
+    use_flash: bool = True  # If use torch 2.0 Flash Attention kernel
     linear_out: bool = True
     scale: bool = True
     value_proj: bool = True
@@ -82,15 +85,21 @@ class AttentionParams(Params):
 @params_decorator
 class FFLayerParams(Params):
     # Position-wise FF layer
-    dropout_drop_prob: float = 0.5
+    dropout_drop_prob: float = 0.0
     activation: Activations = Activations.gelu
     hidden_size: int
 
 
 @params_decorator
+class HeadParams(Params):
+    # General paramters collection for different heads
+    num_classes: Optional[int]
+
+
+@params_decorator
 class TransformerParams(Params):
     # For encoder and decoder layers
-    num_layers: int
+    encoder_input: bool = False
     model_dim: int  # Model input-output dimension
     norm_mode: NormalizationMode = NormalizationMode.on_input
     layer_norm_eps: float = 1e-5
@@ -108,9 +117,12 @@ class TransformerParams(Params):
 
 @params_decorator
 class ModelParams(Params):
-    # TODO: add task head enum and parameter
     model_type: TransformerType
+    model_head: TransformerHead = TransformerHead.lm_model
+    # Possibly may support ViTs in future
     text_input_params: TextInputParams
+    num_layers: int
+    embed_dropout: float = 0.0
 
     encoder_params: Optional[TransformerParams]
     decoder_params: Optional[TransformerParams]
@@ -119,6 +131,14 @@ class ModelParams(Params):
         if self.model_type == TransformerType.decoder_based:
             assert self.decoder_params
             self.decoder_params.causal = True
+
+        if self.model_type == TransformerType.enc_dec_based:
+            assert self.decoder_params
+            assert self.encoder_params
+            self.decoder_params.encoder_input = True
+
+        if self.model_type == TransformerType.encoder_based:
+            assert self.encoder_params
 
     def overwrite_default_attributes(self):
         pass
@@ -135,6 +155,16 @@ class BERTSmall(ModelParams):
 
 
 @Registry.register
-class NANOGpt(ModelParams):
+class Gpt2(ModelParams):
+    # 124M parameters
     def overwrite_default_attributes(self):
         self.model_type = TransformerType.decoder_based
+        # GPT-2 vocab_size of 50257,
+        # padded up to nearest multiple of 64 for efficiency
+        self.text_input_params.vocab_size = 50304
+        self.text_input_params.max_position = 1024
+        self.num_layers = 12
+        self.decoder_params.model_dim = 768
+        self.decoder_params.attention_params.hidden_size = 768
+        self.decoder_params.attention_params.num_heads = 12
+        self.decoder_params.causal = True

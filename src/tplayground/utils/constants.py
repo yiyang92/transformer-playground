@@ -1,6 +1,11 @@
 from enum import Enum, auto
 
 
+class TransformerHead(Enum):
+    lm_model = auto()
+    classifier = auto()
+
+
 class Activations(Enum):
     gelu = auto()
     relu = auto()

@@ -19,6 +19,7 @@ class TransformerLayer(nn.Module):
         self._ff = FeedForward(
             params.ff_layer_params, model_dim=params.model_dim
         )
+        # TODO: add cross attention layer for params.encoder_input == True
 
     def _forward_oninput(self, x: Tensor) -> Tensor:
         """With pre-layer normalization"""
