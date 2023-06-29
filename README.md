@@ -25,3 +25,11 @@ Set mapped volumes in scripts/build_container.sh and use it to create container:
 ```bash
 pushd scripts && chmod +x run_container.sh && run_container.sh && popd
 ```
+
+## Profiler
+
+Currently a simple Bert profiler is supported. After installation (pip install -e .), use as:
+
+```python
+bert_inference_test -p bert_tiny --device <cpu/cuda>
+```

@@ -1,11 +1,11 @@
 import math
-from typing import Optional
 
 import torch
 from torch import Tensor, nn
 
 from tplayground.params import ModelParams
-from tplayground.layers import TransformerLayer
+from tplayground.layers import TransformerLayer, LanguageModelHead
+from tplayground.utils.constants import TransformerHeadType
 
 
 class GPTModel(nn.Module):
@@ -30,10 +30,18 @@ class GPTModel(nn.Module):
         self._out_norm = nn.LayerNorm(
             model_dim, eps=params.decoder_params.layer_norm_eps
         )
-
         # TODO: add model parallelism
-        # TODO: weigth tying
-        # TODO: head and head type and generation/inference for different heads
+        # TODO: generation/inference for different heads
+        if params.model_head == TransformerHeadType.lm_model:
+            self._head = LanguageModelHead(
+                model_dim=model_dim,
+                vocab_size=text_params.vocab_size,
+                bias=False,  # For weigths tiling
+            )
+            self._head.tile_weights(self._wte)
+        else:
+            raise ValueError("Usupported head type")
+
         # init all weights
         self.apply(self._init_weights)
         # GPT-2 paper initialization for residual projections in MHA
@@ -55,9 +63,7 @@ class GPTModel(nn.Module):
         elif isinstance(layer, nn.Embedding):
             nn.init.normal_(layer.weight, mean=0.0, std=0.02)
 
-    def forward(
-        self, input: Tensor, targets: Optional[Tensor] = None
-    ) -> Tensor:
+    def forward(self, input: Tensor, is_infer: bool = False) -> Tensor:
         # Token ids and targets, should be less than max_position
         # input: [b_s, seq_len]
         if input.size()[1] > self._max_pos:
@@ -77,3 +83,11 @@ class GPTModel(nn.Module):
             x = layer(x)
         tr_out = self._out_norm(x)
         # Head
+        if not is_infer:
+            logits = self._head(tr_out)
+        else:
+            # For lm head - only on last position forward
+            if isinstance(self._head, LanguageModelHead):
+                logits = self._head(tr_out[:, [-1], :])
+        
+        return logits

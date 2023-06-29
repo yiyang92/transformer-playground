@@ -7,7 +7,7 @@ from tplayground.utils.constants import (
     TransformerType,
     NormalizationMode,
     Activations,
-    TransformerHead,
+    TransformerHeadType,
 )
 
 
@@ -118,7 +118,7 @@ class TransformerParams(Params):
 @params_decorator
 class ModelParams(Params):
     model_type: TransformerType
-    model_head: TransformerHead = TransformerHead.lm_model
+    model_head: TransformerHeadType
     # Possibly may support ViTs in future
     text_input_params: TextInputParams
     num_layers: int
@@ -149,9 +149,20 @@ class ModelParams(Params):
 
 
 @Registry.register
-class BERTSmall(ModelParams):
+class BertTiny(ModelParams):  # 17M
     def overwrite_default_attributes(self):
         self.model_type = TransformerType.encoder_based
+        self.encoder_params = TransformerParams()
+        self.text_input_params.vocab_size = 30000
+        self.text_input_params.max_position = 512
+        self.num_layers = 3
+        self.encoder_params.model_dim = 384
+        self.encoder_params.attention_params.hidden_size = 384
+        self.encoder_params.attention_params.num_heads = 12
+        self.encoder_params.attention_params.causal = False
+        self.encoder_params.attention_params.use_flash = True
+        self.encoder_params.ff_layer_params.activation = Activations.gelu
+        self.encoder_params.ff_layer_params.hidden_size = 4 * 384
 
 
 @Registry.register
@@ -159,6 +170,8 @@ class Gpt2(ModelParams):
     # 124M parameters
     def overwrite_default_attributes(self):
         self.model_type = TransformerType.decoder_based
+        self.decoder_params = TransformerParams()
+        self.model_head = TransformerHeadType.lm_model
         # GPT-2 vocab_size of 50257,
         # padded up to nearest multiple of 64 for efficiency
         self.text_input_params.vocab_size = 50304

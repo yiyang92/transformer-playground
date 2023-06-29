@@ -1,7 +1,7 @@
 from enum import Enum, auto
 
 
-class TransformerHead(Enum):
+class TransformerHeadType(Enum):
     lm_model = auto()
     classifier = auto()
 
@@ -10,6 +10,7 @@ class Activations(Enum):
     gelu = auto()
     relu = auto()
     mish = auto()
+    swish = auto()
 
 
 class Models(Enum):

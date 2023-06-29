@@ -29,8 +29,14 @@ class LanguageModelHead(TransformerHead):
         self, model_dim: int, vocab_size: int, bias: bool = False
     ) -> None:
         super().__init__()
-
         self._lm_out = nn.Linear(model_dim, vocab_size, bias=bias)
+
+    def tile_weights(self, embed_layer: nn.Embedding) -> None:
+        """Tie input and output embedding layer weights."""
+        # embed.weight: [num_embed, embed_dim]
+        # lm_out.weight: [out_feat, in_feat]
+        assert embed_layer.weight.size() == self._lm_out.weight.size()
+        self._lm_out.weight = embed_layer.weight
 
     def generate(self) -> None:
         return super().generate()

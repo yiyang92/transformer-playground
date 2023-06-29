@@ -7,7 +7,8 @@ name = "transformer-playground"
 version = "0.0.1"
 authors = [{name = "Nikolai Zakharov"}]
 
-#[project.scripts]
+[project.scripts]
+bert_inference_test = "tplayground.scripts.bert_test:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

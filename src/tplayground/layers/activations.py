@@ -1,7 +1,7 @@
 from functools import partial
 
 from torch import Tensor
-from torch.nn.functional import gelu, relu, tanh, softplus
+from torch.nn.functional import gelu, relu, tanh, softplus, silu
 
 from tplayground.utils.constants import Activations
 
@@ -20,4 +20,5 @@ ACTIVATIONS_MAP = {
     Activations.gelu: _gelu_new,
     Activations.relu: relu,
     Activations.mish: _mish,
+    Activations.swish: silu
 }
