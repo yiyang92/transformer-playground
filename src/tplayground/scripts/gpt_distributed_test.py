@@ -62,14 +62,19 @@ def test_ring_attention_non_distributed():
     # Local tensors
     query_local = torch.randn(seq_len, d_model, requires_grad=True).to(device)
     # Local K, V tensors for each block - blocks can be distributed across different GPUs
-    key_locals = [
-        torch.randn(seq_len, d_model, requires_grad=True).to(device)
-        for _ in range(number_of_blocks)
-    ]
-    value_locals = [
-        torch.randn(seq_len, d_model, requires_grad=True).to(device)
-        for _ in range(number_of_blocks)
-    ]
+    # simulating distribution to many gpus in a ring topology
+    key_locals = torch.stack(
+        [
+            torch.randn(seq_len, d_model, requires_grad=True)
+            for _ in range(number_of_blocks)
+        ]
+    ).to(device)
+    value_locals = torch.stack(
+        [
+            torch.randn(seq_len, d_model, requires_grad=True)
+            for _ in range(number_of_blocks)
+        ]
+    ).to(device)
 
     # Используем нашу функцию
     output = RingAttentionFunction.apply(query_local, key_locals, value_locals)
@@ -77,10 +82,9 @@ def test_ring_attention_non_distributed():
     loss.backward()
 
     # Print gradients
-    logger.info("Gradients for query_local:", query_local.grad)
-    for i, (key_grad, value_grad) in enumerate(zip(key_locals, value_locals)):
-        logger.info(f"Gradients for key_local_{i}:", key_grad.grad)
-        logger.info(f"Gradients for value_local_{i}:", value_grad.grad)
+    logger.info("Query gradient: %s", query_local.grad)
+    logger.info("Key gradients: %s", key_locals.grad)
+    logger.info("Value gradients: %s", value_locals.grad)
 
 
 if __name__ == "__main__":
