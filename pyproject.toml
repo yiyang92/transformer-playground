@@ -9,6 +9,8 @@ authors = [{name = "Nikolai Zakharov"}]
 
 [project.scripts]
 bert_inference_test = "tplayground.scripts.bert_test:main"
+gpt_distributed_test = "tplayground.scripts.gpt_distributed_test:main"
+run_distributed = "tplayground.scripts.run_distributed:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
