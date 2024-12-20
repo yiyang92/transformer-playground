@@ -63,20 +63,15 @@ def test_ring_attention_non_distributed():
     query_local = torch.randn(seq_len, d_model, requires_grad=True).to(device)
     # Local K, V tensors for each block - blocks can be distributed across different GPUs
     # simulating distribution to many gpus in a ring topology
-    key_locals = torch.stack(
-        [
-            torch.randn(seq_len, d_model, requires_grad=True)
-            for _ in range(number_of_blocks)
-        ]
-    ).to(device)
-    value_locals = torch.stack(
-        [
-            torch.randn(seq_len, d_model, requires_grad=True)
-            for _ in range(number_of_blocks)
-        ]
-    ).to(device)
+    key_locals = [
+        torch.randn(seq_len, d_model, requires_grad=True, device=device)
+        for _ in range(number_of_blocks)
+    ]
+    value_locals = [
+        torch.randn(seq_len, d_model, requires_grad=True, device=device)
+        for _ in range(number_of_blocks)
+    ]
 
-    # Используем нашу функцию
     output = RingAttentionFunction.apply(query_local, key_locals, value_locals)
     loss = output.sum()
     loss.backward()

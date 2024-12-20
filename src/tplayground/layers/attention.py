@@ -1,4 +1,8 @@
+from typing import Any
+
 import torch
+
+torch.backends.cuda.enable_flash_sdp(True)
 from torch import Tensor, nn
 
 from tplayground.params import AttentionParams
@@ -138,54 +142,54 @@ class RingAttentionTransformerLayer(nn.Module):
 
 class RingAttentionFunction(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, query_local, keys, values):
-        assert keys.requires_grad
-        assert values.requires_grad
-        assert query_local.requires_grad
+    def setup_context(ctx, inputs: tuple[Tensor, Tensor, Tensor], output: Any) -> None:
+        """Save tensors for backward pass."""
+        query_local, keys, values = inputs
+        ctx.save_for_backward(query_local, *keys, *values)
+        ctx.num_blocks = len(keys)
 
-        ctx.save_for_backward(query_local, keys, values)
-        ctx.num_blocks = keys.size(0)
-
-        # Forward pass: compute attention for each block
+    @staticmethod
+    def forward(query_local, keys, values):
+        """Forward pass for the ring attention function, coomputes attention for different blocks and aggregate."""
         outputs = []
-        for i in range(ctx.num_blocks):
+        for i in range(len(keys)):
             out = nn.functional.scaled_dot_product_attention(
                 query_local, keys[i], values[i], attn_mask=None, dropout_p=0.0
             )
             outputs.append(out)
 
         # Aggregate results
-        final_output = torch.stack(outputs).sum(dim=0)
-        return final_output
+        return torch.stack(outputs).sum(dim=0)
 
     @staticmethod
     def backward(ctx, grad_output) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # Retrieve saved tensors
-        query_local, keys, values = ctx.saved_tensors
-        num_blocks = ctx.num_blocks
+        saved_tensors = ctx.saved_tensors
+        query_local = saved_tensors[0]
+        keys = saved_tensors[1 : 1 + ctx.num_blocks]
+        values = saved_tensors[1 + ctx.num_blocks :]
 
         # Initialize gradients
         grad_query = torch.zeros_like(query_local)
-        grad_keys = torch.zeros_like(keys)
-        grad_values = torch.zeros_like(values)
+        grad_keys = [torch.zeros_like(k) for k in keys]
+        grad_values = [torch.zeros_like(v) for v in values]
 
         # Compute gradients for each block
-        for i in range(num_blocks):
-            key_local = keys[i]
-            value_local = values[i]
-
+        for i in range(ctx.num_blocks):
             out = nn.functional.scaled_dot_product_attention(
-                query_local, key_local, value_local, attn_mask=None, dropout_p=0.0
+                query_local, keys[i], values[i], attn_mask=None, dropout_p=0.0
             )
 
             grads = torch.autograd.grad(
                 outputs=out,
-                inputs=(query_local, key_local, value_local),
+                inputs=(query_local, keys[i], values[i]),
                 grad_outputs=grad_output,
                 retain_graph=True,
+                allow_unused=True,
             )
-            grad_query += grads[0]
-            grad_keys[i] += grads[1]
-            grad_values[i] += grads[2]
+            # Accumulate gradients
+            grad_query += grads[0] if grads[0] is not None else 0
+            grad_keys[i] += grads[1] if grads[1] is not None else 0
+            grad_values[i] += grads[2] if grads[2] is not None else 0
 
         return grad_query, grad_keys, grad_values
